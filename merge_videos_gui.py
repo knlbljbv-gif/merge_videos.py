@@ -7,10 +7,28 @@ import re
 import tempfile
 import shutil
 import json
+import sys
 
 # --------- اعدادات ---------
-FFMPEG = "ffmpeg"
-FFPROBE = "ffprobe"
+# محاولة إيجاد ffmpeg/ffprobe محلياً (ضمن مجلد التطبيق أو مجلد PyInstaller المؤقت) ثم السقوط إلى PATH
+BASE_DIR = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+
+
+def resolve_tool(executable_name: str) -> str:
+    candidates = [
+        BASE_DIR / f"{executable_name}.exe",  # ويندوز
+        BASE_DIR / executable_name,            # أنظمة أخرى
+        executable_name,                       # من PATH
+    ]
+    for candidate in candidates:
+        # إذا كان مساراً موجوداً أو يمكن العثور عليه عبر PATH
+        if Path(candidate).exists() or shutil.which(str(candidate)) is not None:
+            return str(candidate)
+    return executable_name
+
+
+FFMPEG = resolve_tool("ffmpeg")
+FFPROBE = resolve_tool("ffprobe")
 
 # ترتيب رقمي للأسماء
 def natural_key(s: str):
@@ -18,9 +36,13 @@ def natural_key(s: str):
 
 # فحص ffmpeg/ffprobe
 def check_ffmpeg() -> bool:
+    def tool_exists(tool_path: str) -> bool:
+        return Path(tool_path).exists() or shutil.which(tool_path) is not None
+
     for tool in [FFMPEG, FFPROBE]:
-        if shutil.which(tool) is None:
-            messagebox.showerror("خطأ", f"{tool} غير موجود في PATH")
+        if not tool_exists(tool):
+            base = Path(tool).name
+            messagebox.showerror("خطأ", f"{base} غير موجود. ضع ffmpeg/ffprobe بجانب البرنامج أو أضِفهما إلى PATH")
             return False
     return True
 
